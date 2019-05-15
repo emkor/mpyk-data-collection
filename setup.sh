@@ -12,7 +12,7 @@ rm get-pip.py
 
 sudo pip install b2
 
-mkdir -p ~/mpk && cd ~/mpk
+-p ~/mpk/data && cd ~/mpk
 git clone https://github.com/emkor/mpyk.git && cd mpyk
 sudo pip install -r requirements.txt && chmod u+x mpyk.py
 
