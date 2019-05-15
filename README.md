@@ -3,7 +3,7 @@ Scripts for collecting public transportation data for Wroclaw; made to run on Ra
 
 ## prerequisites
 - `Raspbian`, `python>=3.5` installed
-- `B2_KEY_ID`, `B2_APP_KEY`, and `B2_BUCKET` environment variables set for [backblaze b2 bucket](https://www.backblaze.com/)
+- `B2_KEY_ID`, `B2_APP_KEY`, and `B2_BUCKET` environment variables set for [backblaze b2 bucket](https://www.backblaze.com/) in `~/.profile`
 
 ## usage
 - `setup.sh` installs OS dependencies and `mpyk`
