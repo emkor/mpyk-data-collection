@@ -11,5 +11,5 @@ Scripts for collecting public transportation data for Wroclaw; made to run on Ra
 - `zip_and_upload.sh <CSV DIR>` must be run daily, preferably using `cron`-job
 - the `crontab` may look like this (`crontab -e`): 
     - `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games`
-    - `0 1 * * * /home/pi/mpk/mpyk-data-collection/zip_and_upload.sh /home/pi/mpk/data 1> /home/pi/mpk/log/zip_and_upload.log 2> /home/pi/mpk/log/zip_and_upload.err`
+    - `5 2 * * * /home/pi/mpk/mpyk-data-collection/zip_and_upload.sh /home/pi/mpk/data 1> /home/pi/mpk/log/zip_and_upload.log 2> /home/pi/mpk/log/zip_and_upload.err`
     - `@reboot /home/pi/mpk/mpyk-data-collection/start.sh 1> /home/pi/mpk/log/start.log 2> /home/pi/mpk/log/start.err`
