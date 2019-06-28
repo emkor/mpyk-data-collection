@@ -10,8 +10,6 @@ for f in $(find ${CSV_DIR} -name "*.csv" | grep -v $(date --iso-8601 --utc)); do
 echo "Done archiving stuff"
 
 echo "Creating listing file..."
-b2 list-file-names mpk-wroclaw | jq '.files[]' | jq '[.fileName, .fileId, .contentLength, .uploadTimestamp]' | jq -r 'join(";")' > ./listing.csv
-LISTING_FILE_COUNT=$(wc -l ./listing.csv)
-b2 upload-file --noProgress ${B2_BUCKET} "listing.csv" "listing.csv"
-rm "listing.csv"
-echo "Done! Listing contains $LISTING_FILE_COUNT files"
+b2 list-file-names ${B2_BUCKET} > listing.json
+b2 upload-file --noProgress ${B2_BUCKET} "listing.json" "listing.json"
+echo "Uploaded file listing"
