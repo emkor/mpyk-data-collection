@@ -3,7 +3,7 @@
 set -e
 
 echo "Installing git..."
-sudo apt-get install -y git zip curl jq
+sudo apt-get install -y git zip curl
 
 echo "Installing pip for Python 3..."
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
