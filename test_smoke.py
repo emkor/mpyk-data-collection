@@ -12,17 +12,18 @@ class SmokeTest(TestCase):
         dates_to_check.append(yesterday)
         if now_utc.hour >= 1:
             dates_to_check.append((now_utc.date() - timedelta(days=1)).isoformat())
-        listing_file = "https://f001.backblazeb2.com/file/mpk-wroclaw/listing.json"
+        listing_file = "https://f001.backblazeb2.com/file/mpk-wroclaw/listing.csv"
         b2_response = requests.get(listing_file)
         self.assertTrue(b2_response.ok)
 
-        file_listing = b2_response.json()
-        file_names = {f["fileName"] for f in file_listing["files"]}
+        csv_rows = [l for l in b2_response.content.decode("utf-8").split("\n") if l]
+        file_names = {line.partition(";")[0] for line in csv_rows}
+
         for date_to_check in dates_to_check:
             lookup_file = f"{date_to_check}.csv.zip"
             self.assertIn(lookup_file, file_names, f"There is no {lookup_file} among: {file_names}")
 
-        file_sizes = [int(s["contentLength"]) for s in file_listing["files"]]
+        file_sizes = {int(line.split(";")[2]) for line in csv_rows}
         self.assertGreaterEqual(min(file_sizes), 4096, f"Some files are smaller than 4096 bytes: {file_sizes}")
 
     def test_website_is_available(self):
