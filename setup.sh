@@ -2,7 +2,8 @@
 
 set -e
 
-echo "Installing git..."
+echo "Installing OS deps..."
+sudo apt-get update
 sudo apt-get install -y git zip curl
 
 echo "Installing pip for Python 3..."

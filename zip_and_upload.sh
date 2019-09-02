@@ -15,7 +15,7 @@ while :
 do
   LISTING=$(b2 list-file-names mpk-wroclaw $NEXT_FILE)
   NEXT_FILE=$(echo $LISTING | jq '.nextFileName' | xargs) # xargs trims string
-  echo $LISTING | jq '.files[]' | jq '[.fileName, .fileId, .contentLength, .uploadTimestamp]' | jq -r 'join(";")' >> ./listing.csv
+  echo $LISTING | jq '.files[]' | jq -r '"\(.fileName);\(.fileId);\(.contentLength);\(.uploadTimestamp)"' >> ./listing.csv
   echo "Added listing page, next file=$NEXT_FILE"
   if [ "$NEXT_FILE" == "null" ]; then
     break
