@@ -42,9 +42,12 @@ def main(in_csv: str, out_csv: str) -> int:
     lines = 0
     with open(out_csv, "wb") as out_csv:
         for in_rows in read_rows_in_chunks(in_csv):
-            output_rows = [(";".join(optimize_row(cells)) + "\n").encode("utf-8") for cells in in_rows if cells]
-            out_csv.writelines(output_rows)
-            lines += len(output_rows)
+            try:
+                output_rows = [(";".join(optimize_row(cells)) + "\n").encode("utf-8") for cells in in_rows if cells]
+                out_csv.writelines(output_rows)
+                lines += len(output_rows)
+            except (ValueError, UnicodeError) as e:
+                print(f"Could not parse {len(in_rows)} rows: {e}; values: {in_rows}")
     return lines
 
 
