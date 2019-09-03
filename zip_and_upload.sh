@@ -23,5 +23,4 @@ do
 done
 LISTING_FILE_COUNT=$(wc -l ./listing.csv)
 b2 upload-file --noProgress ${B2_BUCKET} "listing.csv" "listing.csv"
-rm -f ./listing.csv
 echo "Uploaded listing containing $LISTING_FILE_COUNT files!"
