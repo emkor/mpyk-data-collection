@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
 set -e
-TMP_DIR=$1
+FILE_LIST=$1
+TMP_DIR=$2
 
 mkdir -p $TMP_DIR
 b2 authorize-account ${B2_KEY_ID} ${B2_APP_KEY}
-for REMOTE_ZIP in $(cat "listing.csv")
+for REMOTE_ZIP in $(cat $FILE_LIST)
 do
   echo "Downloading $REMOTE_ZIP"
   b2 download-file-by-name --noProgress ${B2_BUCKET} $REMOTE_ZIP $REMOTE_ZIP
