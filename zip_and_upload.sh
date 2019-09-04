@@ -9,7 +9,7 @@ b2 authorize-account ${B2_KEY_ID} ${B2_APP_KEY}
 for f in $(find ${CSV_DIR} -name "*.csv" | grep -v $(date --iso-8601 --utc))
 do
   echo "Archiving file $f ..."
-  zip --junk-paths -7 "$f.zip" ${f}
+  zip --junk-paths -9 "$f.zip" ${f}
   b2 upload-file --noProgress ${B2_BUCKET} "$f.zip" $(basename "$f.zip")
   rm ${f}
   rm "$f.zip"
