@@ -1,0 +1,11 @@
+version: "3"
+
+services:
+  mpyk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mpyk
+    restart: unless-stopped
+    env_file:
+      - b2_prod.env
