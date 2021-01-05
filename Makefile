@@ -1,9 +1,12 @@
 config: clean setup install
 all: ut build
+redeploy: remote-stop remote-clean upload remote-start
 
 PY3 = python3
 VENV = .venv/$(shell basename $$PWD)
 VENV_PY3 = .venv/$(shell basename $$PWD)/bin/python3
+REMOTE_HOST ?= "rpi4b"
+REMOTE_DIR ?= "/home/ubuntu/mpyk"
 
 clean:
 	@echo "---- Doing cleanup ----"
@@ -32,7 +35,7 @@ build:
 	@echo "---- Building Docker image ---- "
 	@docker build -t "mpyk-data-collection:latest" ./src
 
-run:
+run-dev:
 	@echo "---- Running Docker image ---- "
 	@mkdir -p tmp/csv tmp/zip
 	@docker run --rm --name "mpyk" -v "${PWD}/tmp/csv:/mpyk/csv" -v "${PWD}/tmp/zip:/mpyk/zip" "mpyk-data-collection:latest"
@@ -40,5 +43,29 @@ run:
 clean-run:
 	@echo "---- Removing artifacts ---- "
 	@sudo rm -rf tmp/csv/* tmp/zip/*
+
+remote-clean:
+	@echo "---- Cleaning remote directory ----"
+	@ssh $(REMOTE_HOST) "docker-compose -f $(REMOTE_DIR)/docker-compose.yml down" || true
+	@ssh $(REMOTE_HOST) "sudo rm -rf $(REMOTE_DIR)"
+
+upload:
+	@echo "---- Deploying file artifacts ---- "
+	@ssh $(REMOTE_HOST) "mkdir -p $(REMOTE_DIR) /tmp/mpyk/csv /tmp/mpyk/zip"
+	@scp -C -r src $(REMOTE_HOST):$(REMOTE_DIR)
+	@scp -C docker-compose.yml $(REMOTE_HOST):$(REMOTE_DIR)
+
+remote-build:
+	@echo "---- Building on remote ---- "
+	@ssh $(REMOTE_HOST) "docker-compose -f $(REMOTE_DIR)/docker-compose.yml build"
+
+remote-start:
+	@echo "---- Starting on remote ---- "
+	@ssh $(REMOTE_HOST) "docker-compose -f $(REMOTE_DIR)/docker-compose.yml up -d"
+
+remote-stop:
+	@echo "---- Stopping on remote ---- "
+	@ssh $(REMOTE_HOST) "docker-compose -f $(REMOTE_DIR)/docker-compose.yml stop" || true
+
 
 .PHONY: all config test build clean setup install lint ut at

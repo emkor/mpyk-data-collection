@@ -3,3 +3,5 @@
 *.iml
 
 .pytest_cache
+tmp
+*.pyc
