@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-export B2_KEY_ID=PASTE_HERE_KEY_ID
-export B2_APP_KEY=PASTE_HERE_APP_KEY
-export B2_BUCKET=PASTE_HERE_BUCKET_NAME
