@@ -11,7 +11,7 @@ from os import path
 from threading import RLock
 from time import sleep
 from typing import List, Callable
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_LZMA
 
 from b2sdk.bucket import Bucket
 from b2sdk.v0 import InMemoryAccountInfo, B2Api
@@ -22,10 +22,9 @@ ARCHIVE_EACH_SEC = 60
 
 
 class MpykArchiver:
-    def __init__(self, executor: ThreadPoolExecutor, csv_dir: str, tmp_zip_dir: str,
+    def __init__(self, executor: ThreadPoolExecutor, tmp_zip_dir: str,
                  b2_bucket_factory: Callable[[], Bucket], upload=True):
         self.executor = executor
-        self.csv_dir = csv_dir
         self.tmp_zip_dir = tmp_zip_dir
         self.b2_bucket_factory = b2_bucket_factory
         self.upload = upload
@@ -33,14 +32,13 @@ class MpykArchiver:
             print("Logging into Backblaze B2...")
             _ = self.b2_bucket_factory()
 
-    def archive(self, file_name: str) -> None:
-        csv_file = path.join(self.csv_dir, file_name)
-        zip_file = path.join(self.tmp_zip_dir, f"{file_name}.zip")
-        self.executor.submit(self._zip_and_upload, csv_file, zip_file)
+    def archive(self, csv_file_path: str) -> None:
+        zip_file = path.join(self.tmp_zip_dir, f"{path.basename(csv_file_path)}.zip")
+        self.executor.submit(self._zip_and_upload, csv_file_path, zip_file)
 
     def _zip_and_upload(self, csv_file_path: str, zip_file_path: str):
-        with ZipFile(zip_file_path, 'w') as tmp_zip:
-            tmp_zip.write(csv_file_path)
+        with ZipFile(zip_file_path, 'w', ZIP_LZMA) as tmp_zip:
+            tmp_zip.write(csv_file_path, arcname=path.basename(csv_file_path))
         if self.upload:
             bucket = self.b2_bucket_factory()
             bucket.upload_local_file(zip_file_path, file_name=path.basename(csv_file_path))
@@ -57,7 +55,7 @@ class MpykStore:
         self.buffer_size = buffer_size
         self._lock = RLock()
         self._buffer: List[MpykTransLoc] = []
-        self._last_chunk_date = datetime.utcnow().date()
+        self._last_chunk_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     def add(self, positions: List[MpykTransLoc]):
         new_chunk_date = positions[0].timestamp.date()
@@ -65,7 +63,7 @@ class MpykStore:
             if new_chunk_date != self._last_chunk_date:
                 self.flush()
                 self._buffer = positions
-                self.archiver.archive(f"{self._last_chunk_date.isoformat()}.csv")
+                self.archiver.archive(path.join(self.csv_dir, f"{self._last_chunk_date.isoformat()}.csv"))
             elif len(self._buffer) > self.buffer_size:
                 self.flush()
                 self._buffer = positions
@@ -117,6 +115,7 @@ if __name__ == '__main__':
     each_sec, csv_dir, tmp_zip_dir = int(args[0]), args[1], args[2]
 
     assert each_sec > 0, f"Given each_sec value ({each_sec}) is <= 0"
+    assert each_sec <= 86400, f"Given each_sec value ({each_sec}) is > 86400 (1 day)"
     assert path.isdir(csv_dir), f"Given ({csv_dir}) does not exist"
     assert path.isdir(tmp_zip_dir), f"Given ZIP temporary dir ({tmp_zip_dir}) does not exist"
 
@@ -130,7 +129,7 @@ if __name__ == '__main__':
 
     executor = ThreadPoolExecutor(max_workers=os.cpu_count())
     mpyk_client = MpykClient()
-    mpyk_archiver = MpykArchiver(executor, csv_dir, tmp_zip_dir,
+    mpyk_archiver = MpykArchiver(executor, tmp_zip_dir,
                                  b2_bucket_factory=lambda: get_b2_bucket(app_key_id, app_key, bucket_name),
                                  upload=True)
     mpyk_store = MpykStore(executor, mpyk_archiver, csv_dir)

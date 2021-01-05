@@ -1,6 +1,5 @@
 config: clean setup install
-test: at
-all: test build
+all: ut build
 
 PY3 = python3
 VENV = .venv/$(shell basename $$PWD)
@@ -21,12 +20,16 @@ install:
 	@echo "---- Installing package in virtualenv ---- "
 	@$(VENV_PY3) -m pip install -r requirements.txt
 
+ut:
+	@echo "---- Running unit tests ---- "
+	@$(VENV_PY3) -m pytest -ra -v -s src/test_unit.py
+
 at:
 	@echo "---- Running acceptance tests ---- "
-	@$(VENV_PY3) -m pytest -ra -v -s test
+	@$(VENV_PY3) -m pytest -ra -v -s src/test_data_availability.py
 
 build:
 	@echo "---- Building Docker image ---- "
-	@docker build -t "mpyk-data-collection:latest" .
+	@docker build -t "mpyk-data-collection:latest" ./src
 
 .PHONY: all config test build clean setup install lint ut at
