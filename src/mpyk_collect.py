@@ -43,15 +43,19 @@ class MpykArchiver:
     def _zip_and_upload(self, csv_file_path: str, zip_file_path: str):
         log.info(f"Archiving CSV file at {csv_file_path} into {zip_file_path}")
         zip_file_name = path.basename(csv_file_path)
+        start_time = time.time()
         with ZipFile(zip_file_path, 'w', ZIP_LZMA) as tmp_zip:
             tmp_zip.write(csv_file_path, arcname=zip_file_name)
-        log.info(f"Archiving successful, removing {csv_file_path}")
+        took_s = round(time.time() - start_time, ndigits=3)
+        log.info(f"Archiving successful in {took_s}s, removing {csv_file_path}")
         os.remove(csv_file_path)
         if self.upload:
+            start_time = time.time()
             log.info(f"Uploading file at {zip_file_path} to BackBlaze cloud as {zip_file_name}")
             bucket = self.b2_bucket_factory()
             bucket.upload_local_file(zip_file_path, file_name=zip_file_name)
-            log.info(f"Upload successful, removing {zip_file_path}")
+            took_s = round(time.time() - start_time, ndigits=3)
+            log.info(f"Upload successful in {took_s}s, removing {zip_file_path}")
             os.remove(zip_file_path)
 
 
@@ -65,6 +69,7 @@ class MpykStore:
         self._lock = RLock()
         self._buffer: List[MpykTransLoc] = []
         self._last_chunk_date = datetime.utcnow().date()
+        self.csv_file_lock = RLock()
 
     def add(self, positions: List[MpykTransLoc]):
         new_chunk_date = positions[0].timestamp.date()
@@ -89,10 +94,13 @@ class MpykStore:
 
     def _flush(self, file_path: str, positions: List[MpykTransLoc]):
         log.debug(f"Flushing buffer with {len(positions)} entries into CSV at {file_path}")
-        with open(file_path, "a+") as out_f:
-            csv_writer = csv.writer(out_f)
-            csv_writer.writerows((trans_loc.as_values() for trans_loc in positions))
-        log.info(f"Done writing {len(positions)} entries to CSV at {file_path}")
+        start_time = time.time()
+        with self.csv_file_lock:
+            with open(file_path, "a+") as out_f:
+                csv_writer = csv.writer(out_f)
+                csv_writer.writerows((trans_loc.as_values() for trans_loc in positions))
+        took_s = round(time.time() - start_time, ndigits=3)
+        log.info(f"Done writing {len(positions)} entries in {took_s}s to CSV at {file_path}")
 
 
 class MpykCollector:
@@ -149,7 +157,7 @@ if __name__ == '__main__':
         assert app_key_id, f"Missing B2_APP_KEY_ID env var"
         assert app_key, f"Missing B2_APP_KEY env var"
         assert bucket_name, f"Missing B2_BUCKET_NAME env var"
-        log.info(f"Upload to BackBlaze enabled, using bucket name {bucket_name}")
+        log.info(f"BackBlaze upload enabled: bucket {bucket_name} key ID {app_key_id} key length {len(app_key)}")
     else:
         log.warning(f"B2_BUCKET_NAME env var is missing, disabling BackBlaze file upload!")
 
@@ -164,11 +172,11 @@ if __name__ == '__main__':
 
 
     def sig_handler(signum, frame):
-        log.info("Stopping collector due to signal...")
+        log.info(f"Stopping collector due to signal, might take up to {each_sec}s...")
         mpyk_collector.stop()
-        log.info("Flushing buffer...")
+        log.debug("Flushing buffer...")
         mpyk_store.flush()
-        log.info("Waiting for in-progress tasks...")
+        log.debug("Waiting for in-progress tasks...")
         executor.shutdown(wait=True)
         log.debug("Handling signal finished")
 
