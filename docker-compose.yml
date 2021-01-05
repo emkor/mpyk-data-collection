@@ -10,6 +10,6 @@ services:
     env_file:
       - src/b2_prod.env
     volumes:
-      - "/tmp/mpyk/csv:/mpyk/csv"
-      - "/tmp/mpyk/zip:/mpyk/zip"
+      - "/mnt/storage/mpyk/csv:/mpyk/csv"
+      - "/mnt/storage/mpyk/zip:/mpyk/zip"
     command: [ "python", "./mpyk_collect.py", "15", "/mpyk/csv", "/mpyk/zip" ]

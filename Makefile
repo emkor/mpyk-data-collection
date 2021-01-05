@@ -7,6 +7,7 @@ VENV = .venv/$(shell basename $$PWD)
 VENV_PY3 = .venv/$(shell basename $$PWD)/bin/python3
 REMOTE_HOST ?= "rpi4b"
 REMOTE_DIR ?= "/home/ubuntu/mpyk"
+REMOTE_DATA_DIR ?= "/mnt/storage/mpyk"
 
 clean:
 	@echo "---- Doing cleanup ----"
@@ -22,6 +23,7 @@ setup:
 install:
 	@echo "---- Installing package in virtualenv ---- "
 	@$(VENV_PY3) -m pip install -r src/requirements.txt
+	@$(VENV_PY3) -m pip install -r src/requirements-dev.txt
 
 ut:
 	@echo "---- Running unit tests ---- "
@@ -51,7 +53,7 @@ remote-clean:
 
 upload:
 	@echo "---- Deploying file artifacts ---- "
-	@ssh $(REMOTE_HOST) "mkdir -p $(REMOTE_DIR) /tmp/mpyk/csv /tmp/mpyk/zip"
+	@ssh $(REMOTE_HOST) "mkdir -p $(REMOTE_DIR) $(REMOTE_DATA_DIR)/csv $(REMOTE_DATA_DIR)/zip"
 	@scp -C -r src $(REMOTE_HOST):$(REMOTE_DIR)
 	@scp -C docker-compose.yml $(REMOTE_HOST):$(REMOTE_DIR)
 
