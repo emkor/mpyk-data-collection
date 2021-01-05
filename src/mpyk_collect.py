@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 import csv
+import logging
 import os
 import signal
 import sys
+import time
 from concurrent.futures.thread import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
@@ -17,8 +19,10 @@ from b2sdk.bucket import Bucket
 from b2sdk.v0 import InMemoryAccountInfo, B2Api
 from mpyk import *
 
-BUFFER_SIZE = 1000
+BUFFER_SIZE = 5000
 ARCHIVE_EACH_SEC = 60
+
+log = logging.getLogger("mpyk")
 
 
 class MpykArchiver:
@@ -29,7 +33,7 @@ class MpykArchiver:
         self.b2_bucket_factory = b2_bucket_factory
         self.upload = upload
         if self.upload:
-            print("Logging into Backblaze B2...")
+            log.info("Logging into Backblaze B2...")
             _ = self.b2_bucket_factory()
 
     def archive(self, csv_file_path: str) -> None:
@@ -37,12 +41,17 @@ class MpykArchiver:
         self.executor.submit(self._zip_and_upload, csv_file_path, zip_file)
 
     def _zip_and_upload(self, csv_file_path: str, zip_file_path: str):
+        log.info(f"Archiving CSV file at {csv_file_path} into {zip_file_path}")
+        zip_file_name = path.basename(csv_file_path)
         with ZipFile(zip_file_path, 'w', ZIP_LZMA) as tmp_zip:
-            tmp_zip.write(csv_file_path, arcname=path.basename(csv_file_path))
+            tmp_zip.write(csv_file_path, arcname=zip_file_name)
+        log.info(f"Archiving successful, removing {csv_file_path}")
+        os.remove(csv_file_path)
         if self.upload:
+            log.info(f"Uploading file at {zip_file_path} to BackBlaze cloud as {zip_file_name}")
             bucket = self.b2_bucket_factory()
-            bucket.upload_local_file(zip_file_path, file_name=path.basename(csv_file_path))
-            os.remove(csv_file_path)
+            bucket.upload_local_file(zip_file_path, file_name=zip_file_name)
+            log.info(f"Upload successful, removing {zip_file_path}")
             os.remove(zip_file_path)
 
 
@@ -55,7 +64,7 @@ class MpykStore:
         self.buffer_size = buffer_size
         self._lock = RLock()
         self._buffer: List[MpykTransLoc] = []
-        self._last_chunk_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        self._last_chunk_date = datetime.utcnow().date()
 
     def add(self, positions: List[MpykTransLoc]):
         new_chunk_date = positions[0].timestamp.date()
@@ -79,9 +88,11 @@ class MpykStore:
         self.executor.submit(self._flush, file_name, positions)
 
     def _flush(self, file_path: str, positions: List[MpykTransLoc]):
+        log.debug(f"Flushing buffer with {len(positions)} entries into CSV at {file_path}")
         with open(file_path, "a+") as out_f:
             csv_writer = csv.writer(out_f)
             csv_writer.writerows((trans_loc.as_values() for trans_loc in positions))
+        log.info(f"Done writing {len(positions)} entries to CSV at {file_path}")
 
 
 class MpykCollector:
@@ -95,9 +106,12 @@ class MpykCollector:
     def start(self) -> None:
         self._running = True
         while self._running:
+            log.debug(f"Downloading all tram/bus positions...")
             positions = self.client.get_all_positions()
+            log.debug(f"Storing {len(positions)} positions...")
             self.store.add(positions)
             sleep(each_sec)
+        log.info("Collection is disabled, finishing the collector...")
 
     def stop(self) -> None:
         self._running = False
@@ -108,6 +122,11 @@ def get_b2_bucket(app_key_id: str, app_key: str, bucket: str) -> Bucket:
     b2_api = B2Api(info)
     b2_api.authorize_account("production", app_key_id, app_key)
     return b2_api.get_bucket_by_name(bucket)
+
+
+def setup_logger(level: int = logging.INFO) -> None:
+    logging.basicConfig(format='%(asctime)s UTC | %(levelname)s | %(message)s', level=level)
+    logging.Formatter.converter = time.gmtime
 
 
 if __name__ == '__main__':
@@ -122,32 +141,42 @@ if __name__ == '__main__':
     app_key_id = os.getenv('B2_APP_KEY_ID')
     app_key = os.getenv('B2_APP_KEY')
     bucket_name = os.getenv('B2_BUCKET_NAME')
+    use_b2 = bool(bucket_name)
 
-    assert app_key_id, f"Missing B2_APP_KEY_ID env var"
-    assert app_key, f"Missing B2_APP_KEY env var"
-    assert bucket_name, f"Missing B2_BUCKET_NAME env var"
+    setup_logger()
 
+    if use_b2:
+        assert app_key_id, f"Missing B2_APP_KEY_ID env var"
+        assert app_key, f"Missing B2_APP_KEY env var"
+        assert bucket_name, f"Missing B2_BUCKET_NAME env var"
+        log.info(f"Upload to BackBlaze enabled, using bucket name {bucket_name}")
+    else:
+        log.warning(f"B2_BUCKET_NAME env var is missing, disabling BackBlaze file upload!")
+
+    log.info(f"Starting mpyk collecting data each {each_sec}s into daily CSVs at {csv_dir}")
     executor = ThreadPoolExecutor(max_workers=os.cpu_count())
     mpyk_client = MpykClient()
     mpyk_archiver = MpykArchiver(executor, tmp_zip_dir,
                                  b2_bucket_factory=lambda: get_b2_bucket(app_key_id, app_key, bucket_name),
-                                 upload=True)
+                                 upload=use_b2)
     mpyk_store = MpykStore(executor, mpyk_archiver, csv_dir)
     mpyk_collector = MpykCollector(mpyk_client, mpyk_store, each_sec)
 
 
     def sig_handler(signum, frame):
-        print("Stopping collector due to signal...")
+        log.info("Stopping collector due to signal...")
         mpyk_collector.stop()
-        print("Flushing buffer...")
+        log.info("Flushing buffer...")
         mpyk_store.flush()
-        print("Waiting for in-progress tasks")
+        log.info("Waiting for in-progress tasks...")
         executor.shutdown(wait=True)
-        print("Stopped successfully!")
+        log.debug("Handling signal finished")
 
 
+    log.debug("Registering exit signals...")
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGABRT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
+    log.info(f"Collecting data from {mpyk_client.api_url} ...")
     mpyk_collector.start()

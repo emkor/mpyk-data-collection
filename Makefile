@@ -18,7 +18,7 @@ setup:
 
 install:
 	@echo "---- Installing package in virtualenv ---- "
-	@$(VENV_PY3) -m pip install -r requirements.txt
+	@$(VENV_PY3) -m pip install -r src/requirements.txt
 
 ut:
 	@echo "---- Running unit tests ---- "
@@ -31,5 +31,14 @@ at:
 build:
 	@echo "---- Building Docker image ---- "
 	@docker build -t "mpyk-data-collection:latest" ./src
+
+run:
+	@echo "---- Running Docker image ---- "
+	@mkdir -p tmp/csv tmp/zip
+	@docker run --rm --name "mpyk" -v "${PWD}/tmp/csv:/mpyk/csv" -v "${PWD}/tmp/zip:/mpyk/zip" "mpyk-data-collection:latest"
+
+clean-run:
+	@echo "---- Removing artifacts ---- "
+	@sudo rm -rf tmp/csv/* tmp/zip/*
 
 .PHONY: all config test build clean setup install lint ut at
