@@ -36,8 +36,4 @@ def test_archiver_should_pack_zip():
                     f"Expected text file name ({path.basename(tmp_text_file.name)}) not found in ZIP"
 
         finally:
-            try:
-                os.remove(tmp_text_file.name)
-                os.remove(expected_zip_file)
-            finally:
-                pass
+            os.remove(expected_zip_file)
