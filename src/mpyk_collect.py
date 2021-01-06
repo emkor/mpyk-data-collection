@@ -117,9 +117,12 @@ class MpykCollector:
         self._running = True
         while self._running:
             log.debug(f"Downloading all tram/bus positions...")
-            positions = self.client.get_all_positions()
-            log.debug(f"Storing {len(positions)} positions...")
-            self.store.add(positions)
+            try:
+                positions = self.client.get_all_positions()
+                log.debug(f"Storing {len(positions)} positions...")
+                self.store.add(positions)
+            except ValueError as e:
+                log.exception(f"Error on retrieving positions: {e}")
             sleep(each_sec)
         log.info("Collection is disabled, finishing the collector...")
 
