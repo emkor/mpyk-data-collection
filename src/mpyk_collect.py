@@ -13,7 +13,8 @@ from os import path
 from threading import RLock
 from time import sleep
 from typing import List, Callable
-from zipfile import ZipFile, ZIP_LZMA
+from zipfile import ZipFile, ZIP_DEFLATED
+from zlib import Z_BEST_COMPRESSION
 
 from b2sdk.bucket import Bucket
 from b2sdk.v0 import InMemoryAccountInfo, B2Api
@@ -42,10 +43,11 @@ class MpykArchiver:
 
     def _zip_and_upload(self, csv_file_path: str, zip_file_path: str):
         log.info(f"Archiving CSV file at {csv_file_path} into {zip_file_path}")
-        zip_file_name = path.basename(csv_file_path)
+        csv_file_name = path.basename(csv_file_path)
+        zip_file_name = path.basename(zip_file_path)
         start_time = time.time()
-        with ZipFile(zip_file_path, 'w', ZIP_LZMA) as tmp_zip:
-            tmp_zip.write(csv_file_path, arcname=zip_file_name)
+        with ZipFile(zip_file_path, 'w', ZIP_DEFLATED, compresslevel=Z_BEST_COMPRESSION) as tmp_zip:
+            tmp_zip.write(csv_file_path, arcname=csv_file_name)
         took_s = round(time.time() - start_time, ndigits=3)
         log.info(f"Archiving successful in {took_s}s, removing {csv_file_path}")
         os.remove(csv_file_path)
