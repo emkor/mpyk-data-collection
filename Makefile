@@ -1,6 +1,6 @@
 config: clean setup install
 all: ut build
-redeploy: remote-stop remote-clean upload remote-start
+redeploy: remote-stop remote-clean upload remote-build remote-start
 
 PY3 = python3
 VENV = .venv/$(shell basename $$PWD)
